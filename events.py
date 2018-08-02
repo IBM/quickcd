@@ -179,5 +179,9 @@ def processNextEvent():
     return True
 
 
+def hasHandlers():
+    return len(dispatchTable) != 0
+
+
 # at the end since handlers imports this file also, process handler registrations via decorators
 import eventHandlers

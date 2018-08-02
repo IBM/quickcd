@@ -1,6 +1,6 @@
 import os, signal, time, init
 from common import sh, env
-from events import fetchAndSaveNewEvents, processNextEvent
+from events import fetchAndSaveNewEvents, processNextEvent, hasHandlers
 
 EventCrd = """{
 	"apiVersion":"apiextensions.k8s.io/v1beta1",
@@ -25,8 +25,12 @@ interrupted = False
 
 def interrupt_handler(sig, frame):
     global interrupted
-    interrupted = True
-    print('INTERRUPTED. Exiting as soon as all handlers for event complete.')
+    if interrupted:
+        print('Interrupted twice, exiting.')
+        exit(1)
+    else:
+        interrupted = True
+        print('INTERRUPTED. Exiting as soon as all handlers for event complete.')
 
 
 def main():
@@ -35,6 +39,10 @@ def main():
     init.generateKubeconfig()
     sh('kubectl apply -f-', input=EventCrd)
     init.postInit()
+
+    if not hasHandlers():
+        print("No handlers defined, exiting.")
+        exit(0)
 
     fetchAndSaveNewEvents()
 

@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# useful for development of core quickcd functionality
-# uses local files instead of the built in ones for testing
-# also use the env vars from current env
+# useful for pipeline testing
+# use the env vars from current env
 # create a file called envVars.sh that looks like below to use this run script
 # envVars.sh is in .gitignore to make sure it's not committed
 #
@@ -22,4 +21,4 @@
 
 
 cd `dirname "$0"`
-exec docker run -it --rm --env-file envVars.sh -v`pwd`:/app ibmcom/quickcd
+exec docker run -it --rm --env-file envVars.sh -v`pwd`/init.py:/app/init.py -v`pwd`/eventHandlers.py:/app/eventHandlers.py ibmcom/quickcd:base

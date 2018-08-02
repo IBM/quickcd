@@ -18,6 +18,9 @@ class Env:
         except:
             raise AttributeError
 
+    def __contains__(self, key):
+        return key in os.environ
+
 
 env = Env()
 
