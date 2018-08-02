@@ -1,2 +1,2 @@
-FROM ibmcom/quickcd:edge-base
+FROM ibmcom/quickcd:edge-ibmcloud
 COPY init.py eventHandlers.py /app/

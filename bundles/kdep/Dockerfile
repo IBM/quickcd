@@ -1,4 +1,5 @@
-FROM ibmcom/quickcd:1-base
+ARG VERSION
+FROM ibmcom/quickcd:${VERSION}-base
 RUN apk add --no-cache unzip
 RUN curl -L https://github.com/IBM/kdep/releases/download/v0.1/linux.tar.gz | tar -xvzC /usr/local/bin
 

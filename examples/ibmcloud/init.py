@@ -1,7 +1,6 @@
 import os
 from common import sh, env
 
-# need to fill this out for your env or mount the kubeconfig directly
 def generateKubeconfig():
     sh(f'bx login --apikey {env.CD_BX_TOKEN} -a https://api.ng.bluemix.net')
     sh(f'bx cs region-set {env.CD_REGION_DASHED}')
