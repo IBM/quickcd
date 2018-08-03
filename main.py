@@ -53,6 +53,8 @@ def main():
     while not interrupted and processNextEvent():
         time.sleep(1)  #will prevent busyloop in case of a bug of some sort
 
+    if not interrupted:
+        time.sleep(60)
     print('Clean exit.')
     exit(0)
 
