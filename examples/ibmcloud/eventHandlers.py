@@ -14,7 +14,7 @@ if env.CD_ENVIRONMENT == 'development':
     def PRToStaging(e):
         diff = DeployableDiff.createFromPR(e['pull_request'])
         if not diff:
-            setCommitStatus(e['pull_request']['head']['sha'], BuildStatus.failure, 'Failed to create diff.', '')
+            setCommitStatus(e['pull_request']['head']['sha'], BuildStatus.failure, 'Merge conflict', '')
         else:
             processDiff(diff)
 
