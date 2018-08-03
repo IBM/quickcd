@@ -150,10 +150,10 @@ def processNextEvent():
     events = sh("kubectl get githubevents -o=jsonpath='{.items[*].metadata.name}' -lstatus=pending,org=%s,repo=%s" % (
         env.CD_GITHUB_ORG_NAME,
         env.CD_GITHUB_REPO_NAME,
-    )).split(' ')
-    eventIds = [eid for eid in (int(e.split('-').pop()) for e in events) if eid <= latestEventId]
-    if not eventIds:
+    )).strip()
+    if not events:
         return False
+    eventIds = [eid for eid in (int(e.split('-').pop()) for e in events.split(' ')) if eid <= latestEventId]
     earliestEventId = min(eventIds)
     eventResource = json.loads(sh('kubectl get githubevent -o=json ' + getFullName(earliestEventId)))
     event = eventResource['spec']
