@@ -47,6 +47,7 @@ def main():
     fetchAndSaveNewEvents()
 
     signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, interrupt_handler)
 
     # keep dispatching events until all have been dispatched, unless an interrupt arrives which we catch so we can finish the current dispatch call
     while not interrupted and processNextEvent():
