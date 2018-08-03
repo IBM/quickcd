@@ -13,7 +13,10 @@ if env.CD_ENVIRONMENT == 'development':
 
     def PRToStaging(e):
         diff = DeployableDiff.createFromPR(e['pull_request'])
-        processDiff(diff)
+        if not diff:
+            setCommitStatus(e['pull_request']['head']['sha'], BuildStatus.failure, 'Failed to create diff.', '')
+        else:
+            processDiff(diff)
 
     def filterStagingAndOpened(e):
         return e['pull_request']['base']['ref'] == 'staging' and e['action'] in ['opened', 'reopened']
@@ -38,9 +41,6 @@ elif env.CD_ENVIRONMENT == 'production':
 
 
 def processDiff(diff):
-    if not diff:
-        setCommitStatus(diff.head, BuildStatus.failure, 'Failed to create diff.', diff.outputURL)
-        return
     setCommitStatus(diff.head, BuildStatus.pending, 'Starting deployment..', diff.outputURL)
 
     try:

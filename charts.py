@@ -160,8 +160,8 @@ class Chart:
         values = json.loads(
             self.sh(f'kdep-merge-inherited-values ./{name}/{env.CD_REGION_DASHED}-{env.CD_ENVIRONMENT}-values.yaml'))
         if 'continuousDeployment' in values:
-            self.enabled = values['continuousDeployment'].get('enabled', False)
-            self.tests = list(values['continuousDeployment'].get('integrationTests', {}).keys())
+            self.enabled = values['continuousDeployment'].get('enabled') or False # may be set to null in yaml
+            self.tests = list((values['continuousDeployment'].get('integrationTests') or {}).keys())
 
         if self.name in allReleases:
             chartsByCols = [chart.split('\t') for chart in self.sh(f'helm history {self.name}').split('\n')]
