@@ -42,6 +42,14 @@ def getFullName(name, category=None):
         if part)
 
 
+class ExecutionError(Exception):
+    def __init__(self, message, returncode, stdout, stderr):
+        super().__init__(message)
+        self.out = stdout
+        self.err = stderr
+        self.ret = returncode
+
+
 # todo: add graceful shutdown via SIGTERM first
 # basic command execution function
 # input should ideally be bytes, and is converted to bytes if not already
@@ -76,7 +84,7 @@ def sh(cmd, timeout=5 * M, input=b''):
             print(out)
         return out
     else:
-        raise Exception(f'Failed executing `{cmd}`. Exit code: {ret}. Stdout: {out}. Stderr: {err}')
+        raise ExecutionError(f'Failed executing `{cmd}` Exit code: {ret} Stdout: {out}. Stderr: {err}', ret, out, err)
 
 
 # returns a function that can be used to log messages to GitHub commit/PR
@@ -131,10 +139,19 @@ def newLoggingShell(log=None):
             kwargs.pop('replaceLast')
             replaceLast = True
 
-        out = sh(*args, **kwargs)
-        if not skipLog:
-            log(args[0], out, isCmd=True, replaceLast=replaceLast)
-        return out
+        try:
+            out = sh(*args, **kwargs)
+        except ExecutionError as e:
+            if not skipLog:
+                log(f'Error: <code>{args[0]}</code>',
+                    f'Return code: {e.ret}\nStdout: {e.out}\nStderr: {e.err}',
+                    isCmd=False,
+                    replaceLast=replaceLast)
+            raise
+        else:
+            if not skipLog:
+                log(args[0], out, isCmd=True, replaceLast=replaceLast)
+            return out
 
     return loggingShell
 

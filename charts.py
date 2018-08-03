@@ -37,10 +37,13 @@ class DeployableDiff:
         self.log = log
         self.outputURL = self.log.commentHTMLURL
 
+    def initializeCharts(self):
         allReleases = set(self.sh('helm ls --short --all').split('\n'))
         changedFiles = self.sh(f'git diff --name-only {self.base}..{self.merge}')
         changedDirs = set(file.split('/')[0] for file in changedFiles.split('\n') if '/' in file)
-        self.charts = [Chart(dir, allReleases, sh, log) for dir in changedDirs if os.path.isfile(dir + '/Chart.yaml')]
+        self.charts = [
+            Chart(dir, allReleases, self.sh, self.log) for dir in changedDirs if os.path.isfile(dir + '/Chart.yaml')
+        ]
 
     @classmethod
     def createFromMerge(cls, e):
@@ -91,7 +94,9 @@ class DeployableDiff:
             squad = chartName.split('-')[0]
             self.log(f'Launching integration test: {chartName}')
             releaseName = chartName + time.strftime('-%m-%d-%y--%H-%M-%S')
-            self.sh(f'kdep -i {KDEP_FLAGS} -t {releaseName} ./{chartName}/{env.CD_REGION_DASHED}-{env.CD_ENVIRONMENT}-values.yaml')
+            self.sh(
+                f'kdep -i {KDEP_FLAGS} -t {releaseName} ./{chartName}/{env.CD_REGION_DASHED}-{env.CD_ENVIRONMENT}-values.yaml'
+            )
 
             if not DEBUG:
                 self.log('Job running... 0m')
@@ -159,10 +164,10 @@ class Chart:
             self.tests = list(values['continuousDeployment'].get('integrationTests', {}).keys())
 
         if self.name in allReleases:
-            self.lastRevision = max(
-                int(chart[0])
-                for chart in [chart.split('\t') for chart in self.sh(f'helm history {self.name}').split('\n')]
-                if len(chart) == 5 and 'DEPLOYED' in chart[2])
+            chartsByCols = [chart.split('\t') for chart in self.sh(f'helm history {self.name}').split('\n')]
+            deployedCharts = [chart for chart in chartsByCols if len(chart) == 5 and 'DEPLOYED' in chart[2]]
+            if deployedCharts:
+                self.lastRevision = max(int(chart[0]) for chart in deployedCharts)
 
     def upgrade(self):
         if not self.enabled:

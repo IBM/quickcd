@@ -1,6 +1,43 @@
-ARG VERSION
-FROM ibmcom/quickcd:${VERSION}-kdep
+FROM alpine:3.8
+
+# start from kdep:
+
+RUN apk add --no-cache unzip bash git curl ca-certificates bind-tools python3
+RUN curl -L https://github.com/IBM/kdep/releases/download/v0.1/linux.tar.gz | tar -xvzC /usr/local/bin
+
+#binaries used by kdep
+RUN curl -L https://releases.hashicorp.com/vault/0.10.4/vault_0.10.4_linux_amd64.zip | funzip > /usr/local/bin/vault && chmod +x /usr/local/bin/vault
+RUN curl -L https://releases.hashicorp.com/consul-template/0.19.5/consul-template_0.19.5_linux_amd64.tgz | tar -xvzC /usr/local/bin
+RUN curl -L https://storage.googleapis.com/kubernetes-helm/helm-v2.9.1-linux-amd64.tar.gz | tar --strip-components 1 -xvzC /usr/local/bin
+RUN curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 -o /usr/local/bin/jq && chmod +x /usr/local/bin/jq
+RUN curl -L https://github.com/mikefarah/yq/releases/download/2.1.1/yq_linux_amd64 -o /usr/local/bin/yq && chmod +x /usr/local/bin/yq
+
+
+# start from base:
+
+# RUN apk add --no-cache
+
+# the line below may be needed to install some python packages
+#RUN apk add --no-cache linux-headers build-base
+RUN python3 -m pip install urllib3 certifi
+
+# add kubectl
+RUN curl -L https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl && chmod +x /usr/local/bin/kubectl
+
+CMD ["python3", "/app/main.py"]
+
+# COPY *.py /app/
+
+# end from base
+
+# end from kdep
+
+
+
 #RUN curl -L https://clis.ng.bluemix.net/install/linux | sh
 RUN curl -L https://clis.ng.bluemix.net/download/bluemix-cli/latest/linux64 | tar -vxzC /tmp && /tmp/Bluemix_CLI/install_bluemix_cli && rm -rf /tmp/Bluemix_CLI
 RUN bx plugin install container-service -r Bluemix
-COPY init.py /app/
+
+
+COPY *.py /app/
+COPY bundles/ibmcloud/init.py /app/

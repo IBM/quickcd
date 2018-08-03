@@ -45,6 +45,7 @@ def processDiff(diff):
 
     try:
         # here is the main pipeline
+        diff.initializeCharts()
         upgradeOK = False
         testOK = False
         rollbackOK = False
