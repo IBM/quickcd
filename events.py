@@ -5,7 +5,6 @@ from base64 import b32encode
 
 kubeList = {"apiVersion": "v1", "items": [], "kind": "List"}
 kubeConfigMap = {"apiVersion": "v1", "data": {}, "kind": "ConfigMap", "metadata": {}}
-kubeEvent = {'apiVersion': 'quickcd.cloud.ibm.com/v1', 'kind': 'GitHubEvent'}
 Handler = namedtuple('Handler', ['filterFn', 'handlerFn', 'name', 'id'])
 dispatchTable = defaultdict(list)
 
@@ -14,7 +13,6 @@ dispatchTable = defaultdict(list)
 def fetchAndSaveNewEvents():
     # todo: respect the x-poll-interval header
     # first run don't save anything, second run, even if no id saved previously, save all
-    eventListFilePath = '/tmp/eventList.json'
     try:
         resource = json.loads(sh(f"kubectl get ConfigMap {getFullName('event-cursor')} -ojson"))
     except:
@@ -79,38 +77,41 @@ def fetchAndSaveNewEvents():
         eventDict = dict(
             (e['id'], e) for e in events if any(handler.filterFn(e['payload']) for handler in dispatchTable[e['type']]))
 
-        # save events to file and then to kube
         if eventDict:
-            with open(eventListFilePath, 'w') as f:
-                json.dump(
-                    dict(
-                        kubeList,
-                        items=[
-                            dict(
-                                kubeEvent, **{
-                                    'metadata': {
-                                        'name': getFullName(e['id']),
-                                        'labels': {
-                                            'org': env.CD_GITHUB_ORG_NAME,
-                                            'repo': env.CD_GITHUB_REPO_NAME,
-                                            'status': 'pending'
-                                        }
-                                    },
-                                    'spec': e
-                                }) for e in eventDict.values()
-                        ]),
-                    f,
-                    ensure_ascii=False,
-                    allow_nan=False)
-            sh(f'kubectl apply -f {eventListFilePath}'
-              )  # use apply in case this command worked but saving cursor failed, resulting in resave
+            # use apply in case this command worked but saving cursor failed, resulting in resave
+            # todo: not sure why yapf is using 3 space indenting here and below
+            sh(f'kubectl apply -f-',
+               input=json.dumps(
+                   dict(
+                       kubeList,
+                       items=[
+                           dict(
+                               kubeConfigMap,
+                               metadata={
+                                   'name': getFullName(e['id']),
+                                   'labels': {
+                                       'owner': 'quickcd',
+                                       'kind': 'GitHubEvent',
+                                       'org': env.CD_GITHUB_ORG_NAME,
+                                       'repo': env.CD_GITHUB_REPO_NAME,
+                                       'status': 'pending'
+                                   }
+                               },
+                               data={'event': json.dumps(e, ensure_ascii=False, allow_nan=False)})
+                           for e in eventDict.values()
+                       ]),
+                   ensure_ascii=False,
+                   allow_nan=False))
 
     # below we use create for first run to make sure we don't accidentally override a config that existed but failed to load above
     sh(f"kubectl {'create --save-config' if firstRun else 'apply'} -f-",
        input=json.dumps(
            dict(
                kubeConfigMap,
-               metadata={'name': getFullName('event-cursor')},
+               metadata={
+                   'name': getFullName('event-cursor'),
+                   'labels': {'owner': 'quickcd'}
+               },
                data={
                    'eventID': str(newEventID),
                    'ETag': newETag
@@ -147,7 +148,7 @@ def registerEventHandlerDecorator(eventType, filterFn=lambda e: True):
 def processNextEvent():
     latestEventId = int(
         json.loads(sh('kubectl get configmap -ojson ' + getFullName('event-cursor')))['data']['eventID'])
-    events = sh("kubectl get githubevents -o=jsonpath='{.items[*].metadata.name}' -lstatus=pending,org=%s,repo=%s" % (
+    events = sh("kubectl get configmaps -o=jsonpath='{.items[*].metadata.name}' -lowner=quickcd,kind=GitHubEvent,status=pending,org=%s,repo=%s" % (
         env.CD_GITHUB_ORG_NAME,
         env.CD_GITHUB_REPO_NAME,
     )).strip()
@@ -155,8 +156,8 @@ def processNextEvent():
         return False
     eventIds = [eid for eid in (int(e.split('-').pop()) for e in events.split(' ')) if eid <= latestEventId]
     earliestEventId = min(eventIds)
-    eventResource = json.loads(sh('kubectl get githubevent -o=json ' + getFullName(earliestEventId)))
-    event = eventResource['spec']
+    eventResource = json.loads(sh('kubectl get configmap -o=json ' + getFullName(earliestEventId)))
+    event = json.loads(eventResource['data']['event'])
 
     # now that we have the event of interest, fire all the (remaining) event handlers for it.
     for handler in dispatchTable[event['type']]:
@@ -173,9 +174,9 @@ def processNextEvent():
                 print(traceback.format_exc())
                 time.sleep(60)  #prevent fast retries, todo: stop pipeline instead of infinite retries, retries module
                 raise  # stop pipeline on exc
-            sh(f'kubectl label --overwrite githubevent {getFullName(earliestEventId)} {handler.id}=complete')
+            sh(f'kubectl label --overwrite configmap {getFullName(earliestEventId)} {handler.id}=complete')
 
-    sh(f'kubectl label --overwrite githubevent {getFullName(earliestEventId)} status=handled')
+    sh(f'kubectl label --overwrite configmap {getFullName(earliestEventId)} status=handled')
     return True
 
 

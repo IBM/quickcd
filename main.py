@@ -2,23 +2,6 @@ import os, signal, time, init
 from common import sh, env
 from events import fetchAndSaveNewEvents, processNextEvent, hasHandlers
 
-EventCrd = """{
-	"apiVersion":"apiextensions.k8s.io/v1beta1",
-	"kind":"CustomResourceDefinition",
-	"metadata":{
-		"name":"githubevents.quickcd.cloud.ibm.com"
-	},
-	"spec":{
-		"group":"quickcd.cloud.ibm.com",
-		"names":{
-			"kind":"GitHubEvent",
-			"plural":"githubevents",
-			"singular":"githubevent"
-		},
-		"scope":"Namespaced",
-		"version":"v1"
-	}
-}"""
 
 interrupted = False
 
@@ -36,25 +19,34 @@ def interrupt_handler(sig, frame):
 def main():
     init.preInit()
     init.setupGit()
-    init.generateKubeconfig()
-    sh('kubectl apply -f-', input=EventCrd)
     init.postInit()
 
     if not hasHandlers():
         print("No handlers defined, exiting.")
         exit(0)
 
-    fetchAndSaveNewEvents()
-
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
-    # keep dispatching events until all have been dispatched, unless an interrupt arrives which we catch so we can finish the current dispatch call
-    while not interrupted and processNextEvent():
-        time.sleep(1)  #will prevent busyloop in case of a bug of some sort
+    lastConfig = 0
+    while not interrupted:
+        # refresh config token once an hour
+        if time.time() - lastConfig > 60 * 60:
+            print('Refreshing Kube config')
+            init.generateKubeconfig()
+            lastConfig = time.time()
 
-    if not interrupted:
-        time.sleep(60)
+        fetchAndSaveNewEvents()
+
+        # keep dispatching events until all have been dispatched
+        # unless an interrupt arrives which we catch so we can finish the current dispatch call
+        while not interrupted and processNextEvent():
+            time.sleep(1)  #will prevent busyloop in case of a bug of some sort
+
+        # finished processing all events, take a break
+        if not interrupted:
+            time.sleep(60)
+
     print('Clean exit.')
     exit(0)
 
