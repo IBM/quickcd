@@ -1,8 +1,7 @@
-FROM alpine:3.8
-
 # start from kdep:
 
-RUN apk add --no-cache unzip bash git curl ca-certificates bind-tools python3
+FROM python:3.6-stretch
+RUN apt-get update && apt-get install -y --no-install-recommends unzip dnsutils && rm -rf /var/lib/apt/lists/*
 RUN curl -L https://github.com/IBM/kdep/releases/download/v0.1/linux.tar.gz | tar -xvzC /usr/local/bin
 
 #binaries used by kdep
@@ -24,7 +23,7 @@ RUN python3 -m pip install urllib3 certifi
 # add kubectl
 RUN curl -L https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl && chmod +x /usr/local/bin/kubectl
 
-CMD ["python3", "/app/main.py"]
+CMD ["/usr/local/bin/python", "/app/main.py"]
 
 # COPY *.py /app/
 

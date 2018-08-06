@@ -14,7 +14,7 @@ def fetchAndSaveNewEvents():
     # todo: respect the x-poll-interval header
     # first run don't save anything, second run, even if no id saved previously, save all
     try:
-        resource = json.loads(sh(f"kubectl get ConfigMap {getFullName('event-cursor')} -ojson"))
+        resource = json.loads(sh(f"kubectl -n {env.CD_NAMESPACE} get ConfigMap {getFullName('event-cursor')} -ojson"))
     except:
         firstRun = True
         fetchedETag = '"none"'
@@ -80,7 +80,7 @@ def fetchAndSaveNewEvents():
         if eventDict:
             # use apply in case this command worked but saving cursor failed, resulting in resave
             # todo: not sure why yapf is using 3 space indenting here and below
-            sh(f'kubectl apply -f-',
+            sh(f'kubectl -n {env.CD_NAMESPACE} apply -f-',
                input=json.dumps(
                    dict(
                        kubeList,
@@ -104,13 +104,15 @@ def fetchAndSaveNewEvents():
                    allow_nan=False))
 
     # below we use create for first run to make sure we don't accidentally override a config that existed but failed to load above
-    sh(f"kubectl {'create --save-config' if firstRun else 'apply'} -f-",
+    sh(f"kubectl -n {env.CD_NAMESPACE} {'create --save-config' if firstRun else 'apply'} -f-",
        input=json.dumps(
            dict(
                kubeConfigMap,
                metadata={
                    'name': getFullName('event-cursor'),
-                   'labels': {'owner': 'quickcd'}
+                   'labels': {
+                       'owner': 'quickcd'
+                   }
                },
                data={
                    'eventID': str(newEventID),
@@ -147,16 +149,18 @@ def registerEventHandlerDecorator(eventType, filterFn=lambda e: True):
 # return True if any work was done, execution or cleanup wise, and False if nothing to do
 def processNextEvent():
     latestEventId = int(
-        json.loads(sh('kubectl get configmap -ojson ' + getFullName('event-cursor')))['data']['eventID'])
-    events = sh("kubectl get configmaps -o=jsonpath='{.items[*].metadata.name}' -lowner=quickcd,kind=GitHubEvent,status=pending,org=%s,repo=%s" % (
-        env.CD_GITHUB_ORG_NAME,
-        env.CD_GITHUB_REPO_NAME,
-    )).strip()
+        json.loads(sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -ojson ' +
+                      getFullName('event-cursor')))['data']['eventID'])
+    events = sh(
+        f"kubectl -n {env.CD_NAMESPACE} get configmaps -o=jsonpath='{{.items[*].metadata.name}}'" +
+        f" -lowner=quickcd,kind=GitHubEvent,status=pending,org={env.CD_GITHUB_ORG_NAME},repo={env.CD_GITHUB_REPO_NAME}"
+    ).strip()
     if not events:
         return False
     eventIds = [eid for eid in (int(e.split('-').pop()) for e in events.split(' ')) if eid <= latestEventId]
     earliestEventId = min(eventIds)
-    eventResource = json.loads(sh('kubectl get configmap -o=json ' + getFullName(earliestEventId)))
+    eventResource = json.loads(
+        sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -o=json ' + getFullName(earliestEventId)))
     event = json.loads(eventResource['data']['event'])
 
     # now that we have the event of interest, fire all the (remaining) event handlers for it.
@@ -174,9 +178,10 @@ def processNextEvent():
                 print(traceback.format_exc())
                 time.sleep(60)  #prevent fast retries, todo: stop pipeline instead of infinite retries, retries module
                 raise  # stop pipeline on exc
-            sh(f'kubectl label --overwrite configmap {getFullName(earliestEventId)} {handler.id}=complete')
+            sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(earliestEventId)} {handler.id}=complete'
+              )
 
-    sh(f'kubectl label --overwrite configmap {getFullName(earliestEventId)} status=handled')
+    sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(earliestEventId)} status=handled')
     return True
 
 

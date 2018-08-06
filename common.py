@@ -1,4 +1,4 @@
-import subprocess, os, signal, urllib3, certifi, json, re, traceback
+import subprocess, os, signal, urllib3, certifi, json, re, traceback, threading, time
 
 
 class Env:
@@ -10,6 +10,7 @@ class Env:
         self.CD_REPO_URL = 'https://%s/%s/%s' % (os.environ['CD_GITHUB_DOMAIN'], os.environ['CD_GITHUB_ORG_NAME'],
                                                  os.environ['CD_GITHUB_REPO_NAME'])
         self.CD_DEBUG = os.environ.get('CD_DEBUG', 'false')
+        self.CD_NAMESPACE = os.environ.get('CD_NAMESPACE') or 'default'
 
     # this method only called in absense of instance attribute
     def __getattr__(self, attr):
@@ -19,7 +20,7 @@ class Env:
             raise AttributeError
 
     def __contains__(self, key):
-        return key in os.environ
+        return hasattr(self, key)
 
 
 env = Env()
@@ -224,3 +225,28 @@ def setCommitStatus(commitHash, status, description='', url=''):
         })
     except:  # non critical
         print(traceback.format_exc())
+
+
+interruptEvent = threading.Event()
+
+
+def stillAlive():
+    return not interruptEvent.is_set()
+
+
+def sleep(sec):
+    interruptEvent.wait(sec)
+
+
+def setInterruptHandlers():
+    signal.signal(signal.SIGINT, interrupt_handler)
+    signal.signal(signal.SIGTERM, interrupt_handler)
+
+
+def interrupt_handler(sig, frame):
+    if not stillAlive():
+        print('Interrupted twice, exiting.')
+        exit(1)
+    else:
+        interruptEvent.set()
+        print('INTERRUPTED. Exiting as soon as all handlers for event complete.')

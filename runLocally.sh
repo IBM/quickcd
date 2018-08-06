@@ -18,6 +18,8 @@
 # CD_EMAIL_ADDRESS=noreply@quickcd.ibm.com
 # CD_SMTP_RELAY=smtp.relay.com
 # CD_DEBUG=true
+# CD_CHARTS_DEBUG=true
+# CD_NAMESPACE=default
 # # end of envVars.sh
 
 
