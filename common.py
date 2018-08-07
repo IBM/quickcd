@@ -11,6 +11,8 @@ class Env:
                                                  os.environ['CD_GITHUB_REPO_NAME'])
         self.CD_DEBUG = os.environ.get('CD_DEBUG', 'false')
         self.CD_NAMESPACE = os.environ.get('CD_NAMESPACE') or 'default'
+        if 'CD_REGION_DASHED' in os.environ:
+            self.CD_REGION_UNDASHED = os.environ['CD_REGION_DASHED'].replace('-', '')
 
     # this method only called in absense of instance attribute
     def __getattr__(self, attr):

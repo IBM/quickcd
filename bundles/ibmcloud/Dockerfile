@@ -26,6 +26,7 @@ RUN curl -L https://storage.googleapis.com/kubernetes-release/release/$(curl -s 
 CMD ["/usr/local/bin/python", "/app/main.py"]
 
 # COPY *.py /app/
+# COPY bundles/kdep/charts.py /app/
 
 # end from base
 
@@ -39,4 +40,5 @@ RUN bx plugin install container-service -r Bluemix
 
 
 COPY *.py /app/
+COPY bundles/kdep/charts.py /app/
 COPY bundles/ibmcloud/init.py /app/
