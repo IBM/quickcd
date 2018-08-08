@@ -95,7 +95,7 @@ class DeployableDiff:
             self.log(f'Launching integration test: {chartName}')
             releaseName = chartName + time.strftime('-%m-%d-%y--%H-%M-%S')
             self.sh(
-                f'kdep -i {KDEP_FLAGS} -t {releaseName} ./{chartName}/{env.CD_REGION_DASHED}-{env.CD_ENVIRONMENT}-values.yaml'
+                f'kdep -i {KDEP_FLAGS} -t {releaseName} ./{chartName}/{env.CD_REGION_UNDASHED}-{env.CD_ENVIRONMENT}-values.yaml'
             )
 
             if not DEBUG:
@@ -177,7 +177,7 @@ class Chart:
 
         try:
             self.status = ChartStatus.UPGRADING
-            self.sh(f"kdep -i {KDEP_FLAGS} ./{self.name}/{env.CD_REGION_DASHED}-{env.CD_ENVIRONMENT}-values.yaml")
+            self.sh(f"kdep -i {KDEP_FLAGS} ./{self.name}/{env.CD_REGION_UNDASHED}-{env.CD_ENVIRONMENT}-values.yaml")
         except:
             self.status = ChartStatus.UPGRADEFAILED
             self.log(f'Error deploying chart {self.name}', traceback.format_exc())
