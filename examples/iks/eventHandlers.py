@@ -68,7 +68,6 @@ def processDiff(diff):
                     sendEmail(
                         f"Failed to deploy to {env.CD_CLUSTER_ID}",
                         diff.authors,
-                        f"This is a test email and is safe to ignore, for more info contact roman@us.ibm.com\n" +
                         f"Failed to deploy commit: {diff.head}\nCluster: {env.CD_CLUSTER_ID}\n" +
                         f"Changes {'were rolled' if rollbackOK else 'failed to roll'} back.\n" +
                         f"Here is a link to the output:\n{diff.outputURL}")
