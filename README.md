@@ -32,7 +32,9 @@ Key features
 
 Docker images
 -------------
-Images are built via `buildAndPushImages.sh` and are available on DockerHub under 3 tags:
+Images are built via `buildAndPushImages.sh` and are available at https://hub.docker.com/r/ibmcom/quickcd/.  
+Three tags/flavors are provided:
+
  - base - this is vanilla quickcd which can be good for extending.
  - kdep - this is the base image + [kdep](https://github.com/IBM/kdep) for working with Helm charts
  - iks - this is the kdep image + tools to talk to IBM Cloud Kubernetes Service.
