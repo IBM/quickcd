@@ -42,4 +42,4 @@ RUN bx plugin install container-service -r Bluemix
 
 COPY *.py /app/
 COPY bundles/kdep/charts.py /app/
-COPY bundles/ibmcloud/init.py /app/
+COPY bundles/iks/init.py /app/

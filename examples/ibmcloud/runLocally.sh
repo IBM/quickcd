@@ -22,4 +22,4 @@
 
 
 cd `dirname "$0"`
-exec docker run -it --rm --env-file envVars.sh -v`pwd`/eventHandlers.py:/app/eventHandlers.py ibmcom/quickcd:edge-ibmcloud
+exec docker run -it --rm --env-file envVars.sh -v`pwd`/eventHandlers.py:/app/eventHandlers.py ibmcom/quickcd:edge-iks
