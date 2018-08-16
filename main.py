@@ -12,13 +12,7 @@ def main():
         print("No handlers defined, exiting.")
         exit(0)
 
-    if Path("/app/testEvents.json").is_file():
-        print("Found test events, entering debug mode.")
-        init.generateKubeconfig()
-        with open("/app/testEvents.json") as f:
-            for event in json.load(f):
-                processEvent(event)
-    else:
+    if env.CD_LOCAL_MODE == 'false':
         setInterruptHandlers()
 
         lastConfig = 0
@@ -41,8 +35,16 @@ def main():
             if stillAlive():
                 sleep(60)
 
-        print('Clean exit.')
+        print("Clean exit.")
         exit(0)
+    else:
+        print("Running in local mode: no comments an no status updates in GH, reading events from /app/testEvents.json")
+        init.generateKubeconfig()
+        print("Running handlers for events in /app/testEvents.json")
+        with open("/app/testEvents.json") as f:
+            for event in json.load(f):
+                processEvent(event)
+        print("Clean exit.")
 
 
 if __name__ == "__main__":

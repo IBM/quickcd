@@ -10,6 +10,7 @@ class Env:
         self.CD_REPO_URL = 'https://%s/%s/%s' % (os.environ['CD_GITHUB_DOMAIN'], os.environ['CD_GITHUB_ORG_NAME'],
                                                  os.environ['CD_GITHUB_REPO_NAME'])
         self.CD_DEBUG = os.environ.get('CD_DEBUG', 'false')
+        self.CD_LOCAL_MODE = os.environ.get('CD_LOCAL_MODE', 'false')
         self.CD_NAMESPACE = os.environ.get('CD_NAMESPACE') or 'default'
         if 'CD_REGION_DASHED' in os.environ:
             self.CD_REGION_UNDASHED = os.environ['CD_REGION_DASHED'].replace('-', '')
@@ -20,6 +21,9 @@ class Env:
             return os.environ[attr]
         except:
             raise AttributeError
+
+    def __setattr__(self, attr, val):
+        os.environ[attr] = val
 
     def __contains__(self, key):
         return hasattr(self, key)
@@ -101,9 +105,13 @@ def newPRLogger(prNumber):
 
 def newGithubLogger(newCommentURL):
     content = [f'## {env.CD_CLUSTER_ID}: {currentHandlerFnName}\n']
-    comment = POST(newCommentURL, {'body': '\n'.join(content)})
-    commentAPIURL = comment['url']
-    commentHTMLURL = comment['html_url']
+    if env.CD_LOCAL_MODE == 'false':
+        comment = POST(newCommentURL, {'body': '\n'.join(content)})
+        commentAPIURL = comment['url']
+        commentHTMLURL = comment['html_url']
+    else:
+        commentAPIURL = "RunningInLocalMode"
+        commentHTMLURL = "RunningInLocalMode"
 
     def log(title, body='', isCmd=False, replaceLast=False):
         section = wrapCommentSection(title, body, isCmd=isCmd) if body or isCmd else f'{title}<br/>'
@@ -111,7 +119,10 @@ def newGithubLogger(newCommentURL):
             content[-1] = section
         else:
             content.append(section)
-        PATCH(commentAPIURL, {'body': '\n'.join(content)})
+
+        if env.CD_LOCAL_MODE == 'false':
+            PATCH(commentAPIURL, {'body': '\n'.join(content)})
+
         if env.CD_DEBUG == 'true' and not isCmd:
             print(f"Log: {title}\n{body}")
 
@@ -173,11 +184,11 @@ def getCurrentHandlerFnName():
 
 # these will raise exception for non 2xx code
 # urllib3 autoretries and follows redirects
-def GET(url):
+def getJSON(url):
     return json.loads(checkResponse(http.request('GET', url)).data.decode('utf-8'))
+GET = getJSON
 
-
-def POST(url, data, method='POST'):
+def postJSON(url, data, method='POST'):
     if isinstance(data, dict):
         data = json.dumps(data, ensure_ascii=False, allow_nan=False)
     return json.loads(
@@ -187,12 +198,12 @@ def POST(url, data, method='POST'):
                 url,
                 body=data.encode('utf-8'),
                 headers=dict(http.headers, **{'Content-Type': 'application/json'}))).data.decode('utf-8'))
+POST = postJSON
 
-
-def PATCH(*args, **kwargs):
+def patchJSON(*args, **kwargs):
     kwargs['method'] = 'PATCH'
     return POST(*args, **kwargs)
-
+PATCH = patchJSON
 
 def checkResponse(resp):
     if resp.status < 200 or resp.status > 299:
@@ -218,6 +229,9 @@ def getCommitStatus(commitHash):
 
 
 def setCommitStatus(commitHash, status, description='', url=''):
+    if env.CD_LOCAL_MODE != 'false':
+        return
+    
     try:
         POST(f'{env.CD_REPO_API_URL}/statuses/{commitHash}', {
             "state": status,

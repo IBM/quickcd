@@ -65,6 +65,11 @@ class DeployableDiff:
         commits = [c['commit'] for c in GET(e['commits_url'])]
 
         sh(f'git clone -b {e["base"]["ref"]} {env.CD_REPO_URL} .')
+        
+        if e["head"]["sha"] == sh(f'git merge-base HEAD {e["head"]["sha"]}'):
+            log("Looks like this commit has already been merged.")
+            return False
+
         try:
             if e['head']['repo']['fork']:
                 sh(f'git pull --no-edit --no-ff {e["head"]["repo"]["ssh_url"]} {e["head"]["ref"]}')
