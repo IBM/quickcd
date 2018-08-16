@@ -161,27 +161,29 @@ def processNextEvent():
     earliestEventId = min(eventIds)
     eventResource = json.loads(
         sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -o=json ' + getFullName(earliestEventId)))
-    event = json.loads(eventResource['data']['event'])
+    return processEvent(json.loads(eventResource['data']['event']), earliestEventId, eventResource['metadata']['labels'])
 
+def processEvent(event, eventID=0, currentLabels={}):
     # now that we have the event of interest, fire all the (remaining) event handlers for it.
     for handler in dispatchTable[event['type']]:
-        if handler.filterFn(event['payload']) and handler.id not in eventResource['metadata']['labels']:
+        if handler.filterFn(event['payload']) and handler.id not in currentLabels:
             # reset workspace and call handler
             sh('rm -rf /tmp')
             sh('mkdir -m 777 /tmp')
             os.chdir('/tmp')
             setCurrentHandlerFnName(handler.name)
-            print(f"Event {earliestEventId}. Calling handler: {handler.name}")
+            print(f"Event {eventID}. Calling handler: {handler.name}")
             try:
                 handler.handlerFn(event['payload'])
             except:
                 print(traceback.format_exc())
                 time.sleep(60)  #prevent fast retries, todo: stop pipeline instead of infinite retries, retries module
                 raise  # stop pipeline on exc
-            sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(earliestEventId)} {handler.id}=complete'
-              )
-
-    sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(earliestEventId)} status=handled')
+            if eventID:
+              sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} {handler.id}=complete')
+              
+    if eventID:
+      sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} status=handled')
     return True
 
 

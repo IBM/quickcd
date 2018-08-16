@@ -186,7 +186,7 @@ class Chart:
         return self.status == ChartStatus.UPGRADED
 
     def rollback(self):
-        if self.status != ChartStatus.UPGRADED:
+        if self.status not in (ChartStatus.UPGRADED, ChartStatus.UPGRADEFAILED):
             raise Exception(f"Tried to roll back {self.name} which had status {self.status.name}.")
 
         self.log(f'Rolling {self.name} back to revision {self.lastRevision}')
