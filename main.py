@@ -1,7 +1,8 @@
 import time, init, json
 from common import sh, env, sleep, stillAlive, setInterruptHandlers
-from events import fetchAndSaveNewEvents, processEvent, processNextEvent, hasHandlers
+from events import fetchAndSaveNewEvents, runHandlers, processNextEvent, hasHandlers
 from pathlib import Path
+
 
 def main():
     init.preInit()
@@ -43,7 +44,9 @@ def main():
         print("Running handlers for events in /app/testEvents.json")
         with open("/app/testEvents.json") as f:
             for event in json.load(f):
-                processEvent(event)
+                runHandlers(event, False)
+            for event in json.load(f):
+                runHandlers(event, True)
         print("Clean exit.")
 
 

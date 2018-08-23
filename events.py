@@ -5,7 +5,7 @@ from base64 import b32encode
 
 kubeList = {"apiVersion": "v1", "items": [], "kind": "List"}
 kubeConfigMap = {"apiVersion": "v1", "data": {}, "kind": "ConfigMap", "metadata": {}}
-Handler = namedtuple('Handler', ['filterFn', 'handlerFn', 'name', 'id'])
+Handler = namedtuple('Handler', ['filterFn', 'handlerFn', 'name', 'id', 'isBlocking'])
 dispatchTable = defaultdict(list)
 
 
@@ -122,18 +122,27 @@ def fetchAndSaveNewEvents():
            allow_nan=False))
 
 
-def registerEventHandler(eventType, fn, filterFn=lambda e: True):
+def registerEventHandler(eventType, fn, filterFn=lambda e: True, blocking=True):
     def filterWrapper(e):
         try:
             return filterFn(e)
         except:
             return False
 
-    # todo lambda support?
     id = 'handler-' + b32encode(fn.__name__.encode()).decode().replace('=', '-').lower()[::-1]
-    dispatchTable[eventType].append(Handler(filterWrapper, fn, fn.__name__, id))
+    dispatchTable[eventType].append(Handler(filterWrapper, fn, fn.__name__, id, blocking))
     print(f"Added handler {fn.__name__} for event {eventType}")
     return fn
+
+
+def addBlockingHandler(*args, **kwargs):
+    kwargs['blocking'] = True
+    return registerEventHandler(*args, **kwargs)
+
+
+def addNonBlockingHandler(*args, **kwargs):
+    kwargs['blocking'] = False
+    return registerEventHandler(*args, **kwargs)
 
 
 # can be used like this:
@@ -148,7 +157,7 @@ def registerEventHandlerDecorator(eventType, filterFn=lambda e: True):
 
 # return True if any work was done, execution or cleanup wise, and False if nothing to do
 def processNextEvent():
-    latestEventId = int(
+    maxEventId = int(
         json.loads(sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -ojson ' +
                       getFullName('event-cursor')))['data']['eventID'])
     events = sh(
@@ -157,16 +166,33 @@ def processNextEvent():
     ).strip()
     if not events:
         return False
-    eventIds = [eid for eid in (int(e.split('-').pop()) for e in events.split(' ')) if eid <= latestEventId]
+    eventIds = [eid for eid in (int(e.split('-').pop()) for e in events.split(' ')) if eid <= maxEventId]
+
+    # run nonblocking handlers first if we can
+    for eid in eventIds:
+        eventResource = json.loads(sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -o=json ' + getFullName(eid)))
+        if runHandlers(json.loads(eventResource['data']['event']), False, eid, eventResource['metadata']['labels']):
+            return True
+
     earliestEventId = min(eventIds)
     eventResource = json.loads(
         sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -o=json ' + getFullName(earliestEventId)))
-    return processEvent(json.loads(eventResource['data']['event']), earliestEventId, eventResource['metadata']['labels'])
+    return runHandlers(
+        json.loads(eventResource['data']['event']), True, earliestEventId, eventResource['metadata']['labels'])
 
-def processEvent(event, eventID=0, currentLabels={}):
+
+def runHandlers(event, blocking, eventID=0, labels={}):
     # now that we have the event of interest, fire all the (remaining) event handlers for it.
+    workPerformed = False
     for handler in dispatchTable[event['type']]:
-        if handler.filterFn(event['payload']) and handler.id not in currentLabels:
+        if handler.isBlocking == blocking and handler.filterFn(event['payload']) and handler.id not in labels:
+            lastRun = float(labels.get(f'{handler.id}-last-run', '0'))
+            attempts = int(labels.get(f'{handler.id}-attempts', '0'))
+            if (time.time() - lastRun) / 60 < attempts**3:
+                continue
+            sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)}' +
+               f' {handler.id}-last-run={time.time()} {handler.id}-attempts={attempts+1}')
+            workPerformed = True
             # reset workspace and call handler
             sh('rm -rf /tmp')
             sh('mkdir -m 777 /tmp')
@@ -177,14 +203,25 @@ def processEvent(event, eventID=0, currentLabels={}):
                 handler.handlerFn(event['payload'])
             except:
                 print(traceback.format_exc())
-                time.sleep(60)  #prevent fast retries, todo: stop pipeline instead of infinite retries, retries module
-                raise  # stop pipeline on exc
+                if blocking:
+                    return True  # don't run other handlers for this event since encountered an error
+                else:
+                    continue  # run remaining nonblocking handlers for this evt
             if eventID:
-              sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} {handler.id}=complete')
-              
+                sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} {handler.id}=complete'
+                  )
+
+    # check if any handlers remaining and mark complete if not
     if eventID:
-      sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} status=handled')
-    return True
+        allDone = True
+        for handler in dispatchTable[event['type']]:
+            if handler.filterFn(event['payload']) and handler.id not in labels:
+                allDone = False
+                break
+        if allDone:
+            sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} status=handled')
+
+    return workPerformed
 
 
 def hasHandlers():

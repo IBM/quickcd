@@ -186,7 +186,10 @@ def getCurrentHandlerFnName():
 # urllib3 autoretries and follows redirects
 def getJSON(url):
     return json.loads(checkResponse(http.request('GET', url)).data.decode('utf-8'))
+
+
 GET = getJSON
+
 
 def postJSON(url, data, method='POST'):
     if isinstance(data, dict):
@@ -198,12 +201,18 @@ def postJSON(url, data, method='POST'):
                 url,
                 body=data.encode('utf-8'),
                 headers=dict(http.headers, **{'Content-Type': 'application/json'}))).data.decode('utf-8'))
+
+
 POST = postJSON
+
 
 def patchJSON(*args, **kwargs):
     kwargs['method'] = 'PATCH'
     return POST(*args, **kwargs)
+
+
 PATCH = patchJSON
+
 
 def checkResponse(resp):
     if resp.status < 200 or resp.status > 299:
@@ -231,7 +240,7 @@ def getCommitStatus(commitHash):
 def setCommitStatus(commitHash, status, description='', url=''):
     if env.CD_LOCAL_MODE != 'false':
         return
-    
+
     try:
         POST(f'{env.CD_REPO_API_URL}/statuses/{commitHash}', {
             "state": status,
