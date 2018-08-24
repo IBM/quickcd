@@ -275,3 +275,13 @@ def interrupt_handler(sig, frame):
     else:
         interruptEvent.set()
         print('INTERRUPTED. Exiting as soon as all handlers for event complete.')
+
+
+def writeLabels(item, **kwargs):
+    sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(item)} ' + ' '.join(
+        f'{key}={value}' for key, value in kwargs.items()))
+
+
+def readLabels(item):
+    return json.loads(
+        sh(f'kubectl -n {env.CD_NAMESPACE} get configmap -o=json ' + getFullName(item)))['metadata']['labels']

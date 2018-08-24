@@ -1,5 +1,5 @@
 import json, os, traceback, time
-from common import http, checkResponse, sh, env, getFullName, setCurrentHandlerFnName
+from common import http, checkResponse, sh, env, getFullName, setCurrentHandlerFnName, writeLabels
 from collections import defaultdict, namedtuple
 from base64 import b32encode
 
@@ -186,12 +186,12 @@ def runHandlers(event, blocking, eventID=0, labels={}):
     workPerformed = False
     for handler in dispatchTable[event['type']]:
         if handler.isBlocking == blocking and handler.filterFn(event['payload']) and handler.id not in labels:
-            lastRun = float(labels.get(f'{handler.id}-last-run', '0'))
-            attempts = int(labels.get(f'{handler.id}-attempts', '0'))
-            if (time.time() - lastRun) / 60 < attempts**3:
-                continue
-            sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)}' +
-               f' {handler.id}-last-run={time.time()} {handler.id}-attempts={attempts+1}')
+            if eventID:
+                lastRun = float(labels.get(f'{handler.id}_last_run', '0'))
+                attempts = int(labels.get(f'{handler.id}_attempts', '0'))
+                if (time.time() - lastRun) / 60 < attempts**3:
+                    continue
+                writeLabels(eventID, **{f'{handler.id}_last_run': time.time(), f'{handler.id}_attempts': attempts + 1})
             workPerformed = True
             # reset workspace and call handler
             sh('rm -rf /tmp')
@@ -208,8 +208,7 @@ def runHandlers(event, blocking, eventID=0, labels={}):
                 else:
                     continue  # run remaining nonblocking handlers for this evt
             if eventID:
-                sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} {handler.id}=complete'
-                  )
+                writeLabels(eventID, **{f'{handler.id}': 'complete'})
 
     # check if any handlers remaining and mark complete if not
     if eventID:
@@ -219,7 +218,7 @@ def runHandlers(event, blocking, eventID=0, labels={}):
                 allDone = False
                 break
         if allDone:
-            sh(f'kubectl -n {env.CD_NAMESPACE} label --overwrite configmap {getFullName(eventID)} status=handled')
+            writeLabels(eventID, status='handled')
 
     return workPerformed
 

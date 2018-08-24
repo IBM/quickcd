@@ -43,9 +43,10 @@ def main():
         init.generateKubeconfig()
         print("Running handlers for events in /app/testEvents.json")
         with open("/app/testEvents.json") as f:
-            for event in json.load(f):
+            events = json.load(f)
+            for event in events:
                 runHandlers(event, False)
-            for event in json.load(f):
+            for event in events:
                 runHandlers(event, True)
         print("Clean exit.")
 
