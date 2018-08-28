@@ -114,7 +114,7 @@ def newGithubLogger(newCommentURL):
         commentHTMLURL = "RunningInLocalMode"
 
     def log(title, body='', isCmd=False, replaceLast=False):
-        section = wrapCommentSection(title, body, isCmd=isCmd) if body or isCmd else f'{title}<br/>'
+        section = wrapCommentSection(title, body, isCmd=isCmd) if body or isCmd else f'{title}'
         if replaceLast:
             content[-1] = section
         else:
