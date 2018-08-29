@@ -23,16 +23,15 @@ class ChartStatus(Enum):
 
 class DeployableDiff:
     '''
-    base, head, and merge are commit hashes and authors is a list of tuples like [(john, foo@bar.com),...]
+    base, head, and merge are commit hashes
     for a commit, merge is same as head (since it's already merged)
     for a PR, merge is a new "virtual" commit that we make for the purposes of the diff
     '''
 
-    def __init__(self, base, head, merge, authors, sh, log):
+    def __init__(self, base, head, merge, sh, log):
         self.base = base
         self.head = head
         self.merge = merge
-        self.authors = authors
         self.sh = sh
         self.log = log
         self.outputURL = self.log.commentHTMLURL
@@ -54,8 +53,7 @@ class DeployableDiff:
         sh(f'git clone {env.CD_REPO_URL} .')
         sh(f'git checkout {e["head"]}')
 
-        return cls(e['before'], e['head'], e['head'],
-                   [(c['author']['name'], c['author']['email']) for c in e['commits']], sh, log)
+        return cls(e['before'], e['head'], e['head'], sh, log)
 
     @classmethod
     def createFromPR(cls, e):
@@ -65,7 +63,7 @@ class DeployableDiff:
         commits = [c['commit'] for c in GET(e['commits_url'])]
 
         sh(f'git clone -b {e["base"]["ref"]} {env.CD_REPO_URL} .')
-        
+
         if e["head"]["sha"] == sh(f'git merge-base HEAD {e["head"]["sha"]}'):
             log("Looks like this commit has already been merged.")
             return False
@@ -79,8 +77,7 @@ class DeployableDiff:
             return False
         else:
             mergeHash = sh('git rev-parse HEAD')
-            return cls(e['base']['sha'], e['head']['sha'], mergeHash,
-                       [(c['author']['name'], c['author']['email']) for c in commits], sh, log)
+            return cls(e['base']['sha'], e['head']['sha'], mergeHash, sh, log)
 
     def deploy(self):
         self.log(f'Chart deployment commencing.')
