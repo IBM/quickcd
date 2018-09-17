@@ -43,9 +43,6 @@ def quickCommand(e):
         commands['help'](commit, sh, log)
 
 
-addNonBlockingHandler(
-    'CommitCommentEvent', quickCommand, filterFn=lambda e: e['comment']['body'].startswith('/quickcd'))
-
 # register deploy handlers
 if env.CD_ENVIRONMENT == 'development':
 
@@ -64,6 +61,8 @@ if env.CD_ENVIRONMENT == 'development':
         return e['pull_request']['base']['ref'] == 'staging' and e['action'] in ['opened', 'reopened']
 
     addNonBlockingHandler('PullRequestEvent', PRToStaging, filterFn=filterStagingAndOpened)
+    addNonBlockingHandler(
+        'CommitCommentEvent', quickCommand, filterFn=lambda e: e['comment']['body'].startswith('/quickcd'))
 
 elif env.CD_ENVIRONMENT == 'staging':
 
@@ -72,6 +71,8 @@ elif env.CD_ENVIRONMENT == 'staging':
         processDiff(diff)
 
     addBlockingHandler('PushEvent', pushToStaging, filterFn=lambda e: e['ref'] == 'refs/heads/staging')
+    addNonBlockingHandler(
+        'CommitCommentEvent', quickCommand, filterFn=lambda e: e['comment']['body'].startswith('/quickcd'))
 
 elif env.CD_ENVIRONMENT == 'production':
 
@@ -80,6 +81,8 @@ elif env.CD_ENVIRONMENT == 'production':
         processDiff(diff)
 
     addBlockingHandler('PushEvent', pushToProduction, filterFn=lambda e: e['ref'] == 'refs/heads/production')
+    addNonBlockingHandler(
+        'CommitCommentEvent', quickCommand, filterFn=lambda e: e['comment']['body'].startswith('/quickcd'))
 
 
 def processDiff(diff):
@@ -121,7 +124,6 @@ def processDiff(diff):
                     status = 'No changes made to cluster.'
                 else:
                     status = f"Changes {'were rolled' if rollbackOK else 'failed to roll'} back."
-                finalStatus
                 setCommitStatus(diff.head, BuildStatus.failure, "Deployment failed. " + status, diff.outputURL)
                 diff.log(f'Result: Failure. ({status})')
                 # Try to find who to notify:
